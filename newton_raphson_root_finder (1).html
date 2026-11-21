@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Numerical Root Finder | Newton-Raphson</title>
+<script src="https://cdn.jsdelivr.net/npm/mathjs@13.2.0/lib/browser/math.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+:root{--bg:#f3f6fb;--panel:#fff;--ink:#17243a;--muted:#68778d;--blue:#2457d6;--cyan:#12a6a6;--line:#e4eaf3;--red:#d84a4a;--green:#16845b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Segoe UI,Arial,sans-serif}
+header{background:linear-gradient(120deg,#142b55,#2457d6);color:white;padding:30px max(22px,calc((100% - 1180px)/2))}
+.kicker{font-size:12px;letter-spacing:2px;text-transform:uppercase;opacity:.8;font-weight:700}
+h1{margin:9px 0 6px;font-size:clamp(25px,4vw,38px)}header p{margin:0;color:#dce7ff;max-width:750px;line-height:1.6}
+main{max-width:1180px;margin:26px auto;padding:0 18px 50px}
+.grid{display:grid;grid-template-columns:350px 1fr;gap:18px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:21px;box-shadow:0 5px 20px #233b6510}
+h2{font-size:17px;margin:0 0 17px}.field{margin-bottom:15px}label{display:block;font-size:13px;font-weight:700;margin-bottom:7px;color:#42516a}
+input{width:100%;padding:12px 13px;border:1px solid #d7dfeb;border-radius:9px;font-size:15px;color:var(--ink);outline:none}
+input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #2457d61a}
+.hint{font-size:12px;color:var(--muted);line-height:1.5;margin-top:6px}
+button{border:0;border-radius:9px;padding:12px 15px;font-weight:700;cursor:pointer;font-size:14px}
+.primary{background:var(--blue);color:#fff;width:100%}.primary:hover{background:#1745bd}
+.secondary{background:#edf2fc;color:#234aab}.actions{display:flex;gap:9px;margin-top:10px}.actions button{flex:1}
+.formula{background:#f5f8ff;border:1px solid #e0e9ff;border-radius:10px;padding:13px;font-family:Georgia,serif;text-align:center;font-size:18px;margin:13px 0}
+.note{font-size:12px;color:var(--muted);line-height:1.55;margin-top:14px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px;min-width:0}
+.stat span{display:block;color:var(--muted);font-size:12px;font-weight:600;margin-bottom:7px}
+.stat strong{font-size:clamp(17px,2vw,23px);overflow-wrap:anywhere}
+#status{padding:11px 13px;border-radius:9px;font-size:13px;margin-bottom:15px;display:none;line-height:1.5}
+#status.good{display:block;background:#eaf7f1;color:#176846}#status.warn{display:block;background:#fff4e5;color:#87530d}#status.bad{display:block;background:#fff0f0;color:#a22c2c}
+#plot{height:410px;width:100%}
+.table-wrap{overflow:auto;max-height:370px}
+table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}
+th{background:#f4f7fc;color:#4b5b74;text-align:left;position:sticky;top:0}
+th,td{padding:11px 12px;border-bottom:1px solid var(--line)}
+tbody tr:last-child{background:#f0f8f5;font-weight:700}
+.section-head{display:flex;justify-content:space-between;align-items:center;margin:22px 0 13px}
+.section-head h2{margin:0}
+.pill{font-size:11px;background:#eaf0ff;color:#2450b9;padding:6px 9px;border-radius:30px;font-weight:700}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:18px}
+@media(max-width:850px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}#plot{height:340px}}
+@media(max-width:430px){.stats{grid-template-columns:1fr}.card{padding:16px}}
+</style>
+</head>
+<body>
+<header>
+ <div class="kicker">Numerical Analysis • Interactive Project</div>
+ <h1>Nonlinear Equation Root Finder</h1>
+ <p>Find an approximate root of a nonlinear function using the Newton–Raphson iterative method. Explore every iteration in a table and on the graph.</p>
+</header>
+<main>
+ <div class="grid">
+  <section class="card">
+   <h2>Problem Configuration</h2>
+   <div class="field">
+    <label for="func">Nonlinear function f(x)</label>
+    <input id="func" value="x^3 - x - 2" spellcheck="false">
+    <div class="hint">Examples: x^3-x-2, cos(x)-x, exp(-x)-x, x^2-4. Trigonometric inputs use radians.</div>
+   </div>
+   <div class="field">
+    <label for="x0">Initial guess (X₀)</label>
+    <input id="x0" type="number" value="1.5" step="any">
+   </div>
+   <div class="field">
+    <label for="tol">Tolerance</label>
+    <input id="tol" type="number" value="0.000001" min="0.000000000001" step="any">
+   </div>
+   <div class="hint" style="margin:-5px 0 14px">Stopping rule: stop when two consecutive approximations differ by less than the tolerance: |Xₙ₊₁ − Xₙ| ≤ tolerance.</div>
+   <div class="field">
+    <label for="maxit">Maximum iterations</label>
+    <input id="maxit" type="number" value="50" min="1" max="500" step="1">
+   </div>
+   <div class="formula">x<sub>n+1</sub> = x<sub>n</sub> − f(x<sub>n</sub>) / f′(x<sub>n</sub>)</div>
+   <button class="primary" id="solve">Calculate Root</button>
+   <div class="actions">
+    <button class="secondary" id="example">Load Example</button>
+    <button class="secondary" id="reset">Reset</button>
+   </div>
+   <div class="note"><b>Supported syntax:</b> +, -, *, /, ^, parentheses, sin(x), cos(x), tan(x), exp(x), log(x), sqrt(x), abs(x). Trigonometric functions use radians.</div>
+  </section>
+  <section>
+   <div class="stats">
+    <div class="stat"><span>Approximate Root</span><strong id="root">—</strong></div>
+    <div class="stat"><span>Iterations</span><strong id="count">—</strong></div>
+    <div class="stat"><span>Final |f(x)|</span><strong id="residual">—</strong></div>
+   </div>
+   <div id="status"></div>
+   <div class="card">
+    <div class="section-head" style="margin:0 0 8px"><h2>Function & Iteration Points</h2><span class="pill">Interactive Graph</span></div>
+    <div id="plot"></div>
+   </div>
+  </section>
+ </div>
+ <section class="card" style="margin-top:18px">
+  <div class="section-head"><h2>Iteration Results</h2><span class="pill" id="rowsLabel">0 rows</span></div>
+  <div class="table-wrap">
+   <table>
+    <thead><tr><th>Iteration (n)</th><th>xₙ</th><th>f(xₙ)</th><th>f′(xₙ)</th><th>|xₙ − xₙ₋₁|</th></tr></thead>
+    <tbody id="results"><tr><td colspan="5" style="color:#718096;text-align:center">Enter a function and click Calculate Root.</td></tr></tbody>
+   </table>
+  </div>
+ </section>
+ <footer>Newton–Raphson Method • Educational numerical analysis tool</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let lastData=null;
+function fmt(v){if(!Number.isFinite(v))return String(v);return Number(v).toPrecision(12).replace(/\.?0+$/,'');}
+function setStatus(msg,type){$('status').className=type;$('status').textContent=msg;}
+function clearOutput(){
+ $('root').textContent='—';$('count').textContent='—';$('residual').textContent='—';
+ $('results').innerHTML='<tr><td colspan="5" style="color:#718096;text-align:center">Enter a function and click Calculate Root.</td></tr>';
+ $('rowsLabel').textContent='0 rows';$('status').style.display='none';lastData=null;
+ Plotly.purge('plot');
+}
+function solve(){
+ try{
+  if(typeof math==='undefined'||typeof Plotly==='undefined')throw Error('The math/graph libraries could not load. Check your internet connection and reload this page.');
+  const expr=$('func').value.trim();if(!expr)throw Error('Please enter a function.');
+  const node=math.parse(expr), compiled=node.compile(), deriv=math.derivative(node,'x').compile();
+  const f=x=>compiled.evaluate({x}), df=x=>deriv.evaluate({x});
+  let x=Number($('x0').value),tol=Number($('tol').value),maxit=Number($('maxit').value);
+  if(!Number.isFinite(x))throw Error('Enter a valid initial guess X₀.');
+  if(!(tol>0&&Number.isFinite(tol)))throw Error('Tolerance must be a positive number.');
+  if(!(Number.isInteger(maxit)&&maxit>=1&&maxit<=500))throw Error('Maximum iterations must be an integer from 1 to 500.');
+  const rows=[{n:0,x,fx:f(x),dfx:df(x),step:null}];
+  if(!Number.isFinite(rows[0].fx))throw Error('The function is not defined at X₀.');
+  let converged=Math.abs(rows[0].fx)<=tol, message='',type='good';
+  for(let n=1;n<=maxit&&!converged;n++){
+   const old=x,fx=f(x),slope=df(x);
+   if(!Number.isFinite(slope)||Math.abs(slope)<1e-14)throw Error(`Derivative is zero or undefined near x = ${fmt(x)}. Try a different initial guess.`);
+   x=x-fx/slope;
+   if(!Number.isFinite(x)||Math.abs(x)>1e12)throw Error('The iteration diverged. Try another initial guess.');
+   const fxNew=f(x),dfNew=df(x),step=Math.abs(x-old);
+   if(!Number.isFinite(fxNew))throw Error('The function became undefined during iteration.');
+   rows.push({n,x,fx:fxNew,dfx:dfNew,step});
+   converged=step<=tol;
+  }
+  if(converged){message='Converged: two consecutive approximations differ by no more than the specified tolerance.';type='good';}
+  else{message='Maximum iterations reached. The result may not have converged.';type='warn';}
+  $('root').textContent=fmt(x);$('count').textContent=rows.length-1;$('residual').textContent=fmt(Math.abs(f(x)));
+  setStatus(message,type);
+  $('rowsLabel').textContent=rows.length+' rows';
+  $('results').innerHTML=rows.map(r=>`<tr><td>${r.n}</td><td>${fmt(r.x)}</td><td>${fmt(r.fx)}</td><td>${fmt(r.dfx)}</td><td>${r.step===null?'—':fmt(r.step)}</td></tr>`).join('');
+  lastData={expr,rows};drawPlot(f,rows);
+ }catch(e){setStatus(e.message||'Unable to calculate this function.','bad');}
+}
+function drawPlot(f,rows){
+ const xs=rows.map(r=>r.x),min=Math.min(...xs),max=Math.max(...xs);
+ let lo=min,hi=max;if(Math.abs(hi-lo)<1e-8){lo-=2;hi+=2;}else{const pad=(hi-lo)*.8+.5;lo-=pad;hi+=pad;}
+ const xx=[],yy=[];for(let i=0;i<=500;i++){let x=lo+(hi-lo)*i/500;xx.push(x);let y;try{y=f(x)}catch(e){y=NaN}yy.push(Number.isFinite(y)&&Math.abs(y)<1e8?y:null);}
+ const yVals=yy.filter(v=>v!==null);let yr=[Math.min(0,...yVals),Math.max(0,...yVals)];if(yr[0]===yr[1])yr=[yr[0]-1,yr[1]+1];
+ const points=rows.map(r=>({x:r.x,y:r.fx}));
+ const traces=[
+  {x:xx,y:yy,type:'scatter',mode:'lines',name:'f(x)',line:{color:'#2457d6',width:3}},
+  {x:points.map(p=>p.x),y:points.map(p=>p.y),type:'scatter',mode:'lines+markers',name:'Iteration points',line:{color:'#e08b28',dash:'dot',width:1.5},marker:{size:9,color:'#e08b28'},text:rows.map(r=>`Iteration ${r.n}<br>x = ${fmt(r.x)}<br>f(x) = ${fmt(r.fx)}`),hovertemplate:'%{text}<extra></extra>'},
+  {x:[lo,hi],y:[0,0],type:'scatter',mode:'lines',name:'x-axis',line:{color:'#8290a5',width:1,dash:'dash'},hoverinfo:'skip'}
+ ];
+ Plotly.newPlot('plot',traces,{margin:{l:55,r:20,t:15,b:50},paper_bgcolor:'#fff',plot_bgcolor:'#fff',font:{family:'Segoe UI, Arial',color:'#334155'},xaxis:{title:'x',gridcolor:'#edf1f7',zeroline:false},yaxis:{title:'f(x)',gridcolor:'#edf1f7',zeroline:false,range:yr},legend:{orientation:'h',y:1.12},hovermode:'closest'},{responsive:true,displaylogo:false});
+}
+$('solve').addEventListener('click',solve);
+$('example').addEventListener('click',()=>{$('func').value='x^3 - x - 2';$('x0').value='1.5';$('tol').value='0.000001';$('maxit').value='50';solve();});
+$('reset').addEventListener('click',()=>{$('func').value='';$('x0').value='1';$('tol').value='0.000001';$('maxit').value='50';clearOutput();});
+$('func').addEventListener('keydown',e=>{if(e.key==='Enter')solve();});
+clearOutput();
+</script>
+</body>
+</html>
